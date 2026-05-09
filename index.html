@@ -270,7 +270,14 @@ async function init() {
             btn.textContent = "Microsoftでログイン";
         }
 
-        document.getElementById("start-date").value = toDateInputValue(new Date());
+        const todayVal = toDateInputValue(new Date());
+        document.getElementById("start-date").value = todayVal;
+        document.getElementById("end-date").min = todayVal;
+        document.getElementById("start-date").addEventListener("change", function() {
+            document.getElementById("end-date").min = this.value;
+            if (document.getElementById("end-date").value < this.value)
+                document.getElementById("end-date").value = this.value;
+        });
         const endDateDefault = new Date();
         endDateDefault.setDate(endDateDefault.getDate() + calcDefaultDays() - 1);
         document.getElementById("end-date").value = toDateInputValue(endDateDefault);
@@ -389,6 +396,8 @@ function loadSettings() {
 }
 
 async function fetchAvailability() {
+    if (isFetching) return;
+    isFetching = true;
     const btn = document.getElementById("fetch-btn");
     const content = document.getElementById("results-content");
     btn.disabled = true; btn.textContent = "取得中…";
@@ -396,13 +405,25 @@ async function fetchAvailability() {
     content.innerHTML = "<div class=\"spinner\"></div>";
 
     try {
-        const token = await getToken();
         const startDate = parseDateInput(document.getElementById("start-date").value);
         const endDateInclusive = parseDateInput(document.getElementById("end-date").value);
+        if (endDateInclusive < startDate) {
+            showToast("終了日は開始日以降にしてください", true);
+            btn.disabled = false; btn.textContent = "空き時間を確認する";
+            isFetching = false;
+            return;
+        }
         const endDate = new Date(endDateInclusive);
         endDate.setDate(endDate.getDate() + 1);
-        const days = Math.round((endDate - parseDateInput(document.getElementById("start-date").value)) / 86400000);
+        const days = Math.round((endDate - startDate) / 86400000);
         const s = getSettings();
+        if (s.bizStartH * 60 + s.bizStartM >= s.bizEndH * 60 + s.bizEndM) {
+            showToast("営業開始時刻は営業終了時刻より前にしてください", true);
+            btn.disabled = false; btn.textContent = "空き時間を確認する";
+            isFetching = false;
+            return;
+        }
+        const token = await getToken();
 
         const url = "https://graph.microsoft.com/v1.0/me/calendarView"
             + "?startDateTime=" + encodeURIComponent(toISO8601JST(startDate,0,0,0))
@@ -431,6 +452,7 @@ async function fetchAvailability() {
         content.appendChild(errEl);
     } finally {
         btn.disabled = false; btn.textContent = "空き時間を確認する";
+        isFetching = false;
     }
 }
 
@@ -447,6 +469,10 @@ const JP_HOLIDAYS = new Set([
     "2027-03-21","2027-04-29","2027-05-03","2027-05-04","2027-05-05",
     "2027-07-19","2027-08-11","2027-09-20","2027-09-23",
     "2027-10-11","2027-11-03","2027-11-23",
+    "2028-01-01","2028-01-02","2028-01-10","2028-02-11","2028-02-12","2028-02-23",
+    "2028-03-20","2028-04-29","2028-04-30","2028-05-03","2028-05-04","2028-05-05",
+    "2028-07-17","2028-08-11","2028-09-18","2028-09-22",
+    "2028-10-09","2028-11-03","2028-11-23",
 ]);
 function isJpHoliday(date) {
     const p = function(n) { return String(n).padStart(2, "0"); };
@@ -533,7 +559,13 @@ function displayResults(freeSlots, startDate, days) {
     if (!freeSlots.length) {
         const el = document.createElement("div");
         el.className = "no-slots";
-        el.textContent = "空き時間が見つかりませんでした";
+        const msg = document.createElement("div");
+        msg.textContent = "空き時間が見つかりませんでした";
+        const hint = document.createElement("div");
+        hint.style.cssText = "font-size:12px;margin-top:8px;color:var(--muted);";
+        hint.textContent = "期間を延ばすか、営業時間・最低空き時間の設定を見直してください";
+        el.appendChild(msg);
+        el.appendChild(hint);
         content.appendChild(el);
         return;
     }
@@ -630,6 +662,10 @@ async function addEvent() {
     const baseDate = new Date(pendingSlot.dateISO);
     const sp = document.getElementById("modal-start").value.split(":").map(Number);
     const ep = document.getElementById("modal-end").value.split(":").map(Number);
+    if (sp.length < 2 || ep.length < 2 || isNaN(sp[0]) || isNaN(ep[0]) || isNaN(sp[1]) || isNaN(ep[1])) {
+        showToast("時刻を正しく入力してください", true);
+        return;
+    }
     const notes = document.getElementById("modal-notes").value.trim();
     const startISO = toISO8601JST(baseDate, sp[0], sp[1], 0);
     const endISO   = toISO8601JST(baseDate, ep[0], ep[1], 0);
@@ -739,6 +775,7 @@ document.addEventListener("keydown", function(e) {
         && document.activeElement.tagName !== "TEXTAREA") addEvent();
 });
 
+let isFetching = false;
 let lastEvents = [];
 let lastCalData = null;
 
