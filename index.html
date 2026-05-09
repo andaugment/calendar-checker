@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>空き時間チェッカー</title>
+    <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+    <style>
+        :root{--primary:#0078d4;--primary-hover:#106ebe;--bg:#f3f2f1;--surface:#ffffff;--border:#e1e1e1;--text:#323130;--muted:#605e5c;--green:#107c10;--green-bg:#dff0d4;--green-border:#9fcf87;--red:#d13438;}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Segoe UI','Yu Gothic UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+        .header{background:var(--primary);color:white;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+        .header h1{font-size:18px;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;font-size:13px;}
+        .btn-logout{background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.4);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;}
+        .btn-logout:hover{background:rgba(255,255,255,.3);}
+        .main{max-width:820px;margin:0 auto;padding:24px 16px;}
+        .card{background:var(--surface);border-radius:8px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+        .setup-banner{background:#fff4ce;border:1px solid #f0c040;border-radius:8px;padding:20px 24px;margin-bottom:16px;}
+        .setup-banner h3{color:#7d5800;margin-bottom:10px;}
+        .setup-banner ol{padding-left:20px;font-size:13px;color:#4a3500;line-height:2.2;}
+        .setup-banner code{background:rgba(0,0,0,.08);padding:1px 6px;border-radius:3px;font-family:monospace;font-size:12px;}
+        .login-card{text-align:center;padding:56px 32px;}
+        .login-card h2{font-size:22px;margin-bottom:8px;}
+        .login-card p{color:var(--muted);margin-bottom:28px;}
+        .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+        @media(max-width:560px){.settings-grid{grid-template-columns:1fr;}}
+        .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
+        .field input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-family:inherit;color:var(--text);}
+        .field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(0,120,212,.15);}
+        .btn-primary{background:var(--primary);color:white;border:none;padding:11px 28px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;width:100%;transition:background .15s;}
+        .btn-primary:hover:not(:disabled){background:var(--primary-hover);}
+        .btn-primary:disabled{background:#c8c6c4;cursor:not-allowed;}
+        .btn-secondary{background:white;color:var(--primary);border:1px solid var(--primary);padding:7px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;}
+        .btn-secondary:hover{background:#f0f6ff;}
+        .btn-ghost{background:none;color:var(--muted);border:1px solid var(--border);padding:9px 20px;border-radius:4px;font-size:13px;cursor:pointer;}
+        .btn-ghost:hover{background:var(--bg);}
+        .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+        .results-header h2{font-size:15px;font-weight:600;}
+        .day-group{margin-bottom:20px;}
+        .day-label{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+        .slot-list{display:flex;flex-wrap:wrap;gap:8px;}
+        .slot-chip{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;user-select:none;transition:background .15s,transform .1s;}
+        .slot-chip:hover{background:#c6e8b0;transform:translateY(-1px);}
+        .slot-chip:active{transform:translateY(0);}
+        .slot-chip .plus{color:var(--green);font-weight:700;}
+        .no-slots{text-align:center;color:var(--muted);padding:40px;font-size:14px;}
+        .spinner{text-align:center;padding:40px;}
+        .spinner::after{content:'';display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px;}
+        .modal-overlay.open{display:flex;}
+        .modal{background:white;border-radius:10px;padding:28px;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.25);}
+        .modal h3{font-size:17px;margin-bottom:22px;}
+        .form-group{margin-bottom:16px;}
+        .form-group label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
+        .form-group input,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-family:inherit;}
+        .form-group input:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(0,120,212,.15);}
+        .form-group input[readonly]{background:var(--bg);color:var(--muted);cursor:default;}
+        .form-group textarea{resize:vertical;min-height:72px;}
+        .time-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;}
+        .toast{position:fixed;bottom:24px;right:24px;background:#323130;color:white;padding:12px 20px;border-radius:6px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:200;max-width:320px;}
+        .toast.show{opacity:1;transform:translateY(0);}
+        .toast.error{background:var(--red);}
+    </style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="view-login">
+  <div class="header"><h1>&#128197; 空き時間チェッカー</h1></div>
+  <div class="main">
+    <div id="setup-banner" class="setup-banner" style="display:none">
+      <h3>&#9881;&#65039; 初回セットアップ：Azure ADアプリ登録が必要です</h3>
+      <ol>
+        <li><a href="https://portal.azure.com" target="_blank">https://portal.azure.com</a> にアクセス</li>
+        <li>「Azure Active Directory」→「アプリの登録」→「新規登録」</li>
+        <li>名前: <code>空き時間チェッカー</code></li>
+        <li>サポートアカウント: <code>任意の組織ディレクトリ内のアカウントおよび個人用Microsoftアカウント</code></li>
+        <li>リダイレクトURI: <code>Web</code> を選択 → <code>http://localhost:8080</code></li>
+        <li>「登録」→「概要」からアプリケーション(クライアント)IDをコピー</li>
+        <li>このファイル冒頭の <code>CLIENT_ID = &quot;YOUR_CLIENT_ID_HERE&quot;</code> を書き換えて保存</li>
+      </ol>
+    </div>
+    <div class="card login-card">
+      <h2>Microsoftアカウントでログイン</h2>
+      <p>Outlookカレンダーの空き時間を確認します</p>
+      <button class="btn-primary" id="login-btn" onclick="login()" style="width:auto;padding:12px 40px;">Microsoftでログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN VIEW -->
+<div id="view-main" style="display:none">
+  <div class="header">
+    <h1>&#128197; 空き時間チェッカー</h1>
+    <div class="header-right">
+      <span id="user-label"></span>
+      <button class="btn-logout" onclick="logout()">ログアウト</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="card">
+      <div class="settings-grid">
+        <div class="field"><label>開始日</label><input type="date" id="start-date"></div>
+        <div class="field"><label>確認日数</label><input type="number" id="days-ahead" value="5" min="1" max="30"></div>
+      </div>
+      <button class="btn-primary" id="fetch-btn" onclick="fetchAvailability()">空き時間を確認する</button>
+    </div>
+    <div id="results-section" style="display:none">
+      <div class="card">
+        <div class="results-header">
+          <h2 id="results-title">空き時間</h2>
+          <button class="btn-secondary" onclick="copyAll()">&#128203; テキストコピー</button>
+        </div>
+        <div id="results-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MEETING MODAL -->
+<div class="modal-overlay" id="modal" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <h3>&#128197; 予定を追加</h3>
+    <div class="form-group"><label>日時（空き枠）</label><input type="text" id="modal-datetime" readonly></div>
+    <div class="form-group"><label>タイトル <span style="color:var(--red)">*</span></label><input type="text" id="modal-title" placeholder="例：〇〇様MTG"></div>
+    <div class="time-row">
+      <div class="form-group"><label>開始時刻</label><input type="time" id="modal-start"></div>
+      <div class="form-group"><label>終了時刻</label><input type="time" id="modal-end"></div>
+    </div>
+    <div class="form-group"><label>メモ（任意）</label><textarea id="modal-notes" placeholder="会議の詳細・場所など"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn-primary" id="add-btn" onclick="addEvent()" style="width:auto;padding:9px 28px">追加する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+// ============================================================
+// ★ 設定：Azure ADアプリ登録後にCLIENT_IDを変更してください
+// ============================================================
+const CLIENT_ID = "YOUR_CLIENT_ID_HERE";
+
+const SETTINGS = {
+    businessStart: 9,
+    businessEnd:   18,
+    bufferMin:     60,
+    minSlotMin:    30,
+};
+// ============================================================
+
+// localhost と本番URL の両方で動作するよう自動判定
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+const msalInstance = new msal.PublicClientApplication({
+    auth: {
+        clientId: CLIENT_ID,
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: REDIRECT_URI,
+    },
+    cache: { cacheLocation: "sessionStorage" },
+});
+
+const SCOPES = ["Calendars.Read", "Calendars.ReadWrite"];
+const DAYS_JA = ["日","月","火","水","木","金","土"];
+
+let account = null;
+let pendingSlot = null;
+let lastFreeSlots = [];
+
+async function init() {
+    await msalInstance.initialize();
+    if (CLIENT_ID === "YOUR_CLIENT_ID_HERE") {
+        document.getElementById("setup-banner").style.display = "block";
+        document.getElementById("login-btn").disabled = true;
+    }
+    document.getElementById("start-date").value = toDateInputValue(new Date());
+    try {
+        const resp = await msalInstance.handleRedirectPromise();
+        if (resp) { account = resp.account; showMain(); return; }
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) { account = accounts[0]; showMain(); }
+    } catch(e) { console.error(e); }
+}
+
+function showMain() {
+    document.getElementById("view-login").style.display = "none";
+    document.getElementById("view-main").style.display = "block";
+    document.getElementById("user-label").textContent = account.username;
+}
+
+async function login() {
+    try {
+        const r = await msalInstance.loginPopup({ scopes: SCOPES });
+        account = r.account; showMain();
+    } catch(e) {
+        if (e.errorCode !== "user_cancelled") showToast("ログイン失敗: " + e.message, true);
+    }
+}
+
+function logout() {
+    msalInstance.logoutPopup().then(() => {
+        account = null;
+        document.getElementById("view-login").style.display = "block";
+        document.getElementById("view-main").style.display = "none";
+        document.getElementById("results-section").style.display = "none";
+    });
+}
+
+async function getToken() {
+    try {
+        const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
+        return r.accessToken;
+    } catch {
+        const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+        return r.accessToken;
+    }
+}
+
+async function fetchAvailability() {
+    const btn = document.getElementById("fetch-btn");
+    const content = document.getElementById("results-content");
+    btn.disabled = true; btn.textContent = "取得中…";
+    document.getElementById("results-section").style.display = "block";
+    content.innerHTML = "<div class=\"spinner\"></div>";
+
+    try {
+        const token = await getToken();
+        const startDate = parseDateInput(document.getElementById("start-date").value);
+        const days = Math.max(1, parseInt(document.getElementById("days-ahead").value) || 5);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + days);
+
+        const url = "https://graph.microsoft.com/v1.0/me/calendarView"
+            + "?startDateTime=" + encodeURIComponent(toISO8601JST(startDate,0,0,0))
+            + "&endDateTime="   + encodeURIComponent(toISO8601JST(endDate,0,0,0))
+            + "&$select=subject,start,end,isAllDay"
+            + "&$orderby=start/dateTime"
+            + "&$top=200";
+
+        const resp = await fetch(url, {
+            headers: { Authorization: "Bearer " + token, Prefer: "outlook.timezone=\"Asia/Tokyo\"" }
+        });
+        if (!resp.ok) throw new Error("カレンダー取得エラー（HTTP " + resp.status + "）");
+
+        const { value: events } = await resp.json();
+        lastFreeSlots = calcFreeSlots(events, startDate, days);
+        displayResults(lastFreeSlots, startDate, days);
+    } catch(e) {
+        const errEl = document.createElement("div");
+        errEl.className = "no-slots";
+        errEl.style.color = "var(--red)";
+        errEl.textContent = "エラー: " + e.message;
+        content.innerHTML = "";
+        content.appendChild(errEl);
+    } finally {
+        btn.disabled = false; btn.textContent = "空き時間を確認する";
+    }
+}
+
+function calcFreeSlots(events, startDate, days) {
+    const result = [];
+    for (let i = 0; i < days; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        const dow = date.getDay();
+        if (dow === 0 || dow === 6) continue;
+        const slots = calcDaySlots(events, date);
+        if (slots.length > 0) result.push({ date, slots });
+    }
+    return result;
+}
+
+function calcDaySlots(events, date) {
+    const dayStart = localHM(date, SETTINGS.businessStart, 0);
+    const dayEnd   = localHM(date, SETTINGS.businessEnd,   0);
+
+    const hasAllDay = events.some(e => {
+        if (!e.isAllDay) return false;
+        return sameDay(new Date(e.start.date + "T00:00:00"), date);
+    });
+    if (hasAllDay) return [];
+
+    const dayEvents = events.filter(e => {
+        if (e.isAllDay) return false;
+        const s = parseJST(e.start.dateTime), en = parseJST(e.end.dateTime);
+        return s < dayEnd && en > dayStart;
+    });
+
+    const blocks = dayEvents.map(e => {
+        const s = parseJST(e.start.dateTime), en = parseJST(e.end.dateTime);
+        const buf = new Date(en.getTime() + SETTINGS.bufferMin * 60000);
+        return {
+            start: new Date(Math.max(s.getTime(),   dayStart.getTime())),
+            end:   new Date(Math.min(buf.getTime(), dayEnd.getTime())),
+        };
+    });
+
+    blocks.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const b of blocks) {
+        if (!merged.length || b.start >= merged[merged.length-1].end) {
+            merged.push({ start: new Date(b.start), end: new Date(b.end) });
+        } else {
+            const last = merged[merged.length-1];
+            last.end = new Date(Math.max(last.end.getTime(), b.end.getTime()));
+        }
+    }
+
+    const free = [];
+    let cur = new Date(dayStart);
+    for (const blk of merged) {
+        if (cur < blk.start && minDiff(cur, blk.start) >= SETTINGS.minSlotMin)
+            free.push({ start: new Date(cur), end: new Date(blk.start) });
+        if (blk.end > cur) cur = new Date(blk.end);
+    }
+    if (cur < dayEnd && minDiff(cur, dayEnd) >= SETTINGS.minSlotMin)
+        free.push({ start: new Date(cur), end: new Date(dayEnd) });
+    return free;
+}
+
+function displayResults(freeSlots, startDate, days) {
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + days - 1);
+    document.getElementById("results-title").textContent =
+        "空き時間（" + fmtShort(startDate) + "～" + fmtShort(endDate) + "）";
+
+    const content = document.getElementById("results-content");
+    if (!freeSlots.length) {
+        content.innerHTML = "<div class=\"no-slots\">空き時間が見つかりませんでした</div>";
+        return;
+    }
+
+    content.innerHTML = freeSlots.map(function(item) {
+        const chips = item.slots.map(function(s) {
+            const d = item.date;
+            return "<div class=\"slot-chip\" onclick=\"openModal(" + JSON.stringify(d.toISOString()) + "," + JSON.stringify(s.start.toISOString()) + "," + JSON.stringify(s.end.toISOString()) + "," + JSON.stringify(fmtDayLabel(d)) + ")\">"
+                + "<span class=\"plus\">＋</span>" + fmtTime(s.start) + "～" + fmtTime(s.end) + "</div>";
+        }).join("");
+        return "<div class=\"day-group\"><div class=\"day-label\">" + fmtDayLabel(item.date) + "</div><div class=\"slot-list\">" + chips + "</div></div>";
+    }).join("");
+}
+
+function copyAll() {
+    if (!lastFreeSlots.length) return;
+    const text = lastFreeSlots.map(function(item) {
+        const times = item.slots.map(function(s) { return fmtTime(s.start) + "～" + fmtTime(s.end); }).join("、");
+        return fmtDayLabel(item.date) + " " + times;
+    }).join("\n");
+    navigator.clipboard.writeText(text)
+        .then(function() { showToast("クリップボードにコピーしました"); })
+        .catch(function() { showToast("コピーに失敗しました", true); });
+}
+
+function openModal(dateISO, startISO, endISO, label) {
+    const start = new Date(startISO), end = new Date(endISO);
+    pendingSlot = { dateISO: dateISO, start: start, end: end };
+    document.getElementById("modal-datetime").value = label + " " + fmtTime(start) + "～" + fmtTime(end);
+    document.getElementById("modal-title").value = "";
+    document.getElementById("modal-start").value = fmtTimeInput(start);
+    document.getElementById("modal-end").value   = fmtTimeInput(end);
+    document.getElementById("modal-notes").value = "";
+    document.getElementById("modal").classList.add("open");
+    setTimeout(function() { document.getElementById("modal-title").focus(); }, 50);
+}
+
+function closeModal() {
+    document.getElementById("modal").classList.remove("open");
+    pendingSlot = null;
+}
+
+function onOverlayClick(e) {
+    if (e.target === document.getElementById("modal")) closeModal();
+}
+
+async function addEvent() {
+    const title = document.getElementById("modal-title").value.trim();
+    if (!title) { document.getElementById("modal-title").focus(); return; }
+
+    const baseDate = new Date(pendingSlot.dateISO);
+    const sp = document.getElementById("modal-start").value.split(":").map(Number);
+    const ep = document.getElementById("modal-end").value.split(":").map(Number);
+    const notes = document.getElementById("modal-notes").value.trim();
+    const startISO = toISO8601JST(baseDate, sp[0], sp[1], 0);
+    const endISO   = toISO8601JST(baseDate, ep[0], ep[1], 0);
+
+    const addBtn = document.getElementById("add-btn");
+    addBtn.disabled = true; addBtn.textContent = "追加中…";
+
+    try {
+        const token = await getToken();
+        const resp = await fetch("https://graph.microsoft.com/v1.0/me/events", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                subject: title,
+                body: { contentType: "text", content: notes },
+                start: { dateTime: startISO, timeZone: "Asia/Tokyo" },
+                end:   { dateTime: endISO,   timeZone: "Asia/Tokyo" },
+            }),
+        });
+        if (!resp.ok) throw new Error("Graph API " + resp.status);
+        closeModal();
+        showToast("「" + title + "」を追加しました");
+        setTimeout(fetchAvailability, 800);
+    } catch(e) {
+        showToast("追加失敗: " + e.message, true);
+    } finally {
+        addBtn.disabled = false; addBtn.textContent = "追加する";
+    }
+}
+
+function parseJST(dtStr) {
+    if (!dtStr) return new Date(NaN);
+    const clean = dtStr.replace(/\.\d+$/, "");
+    if (clean.includes("+") || clean.endsWith("Z")) return new Date(clean);
+    return new Date(clean + "+09:00");
+}
+
+function localHM(date, h, m) { const d = new Date(date); d.setHours(h,m,0,0); return d; }
+
+function toISO8601JST(date, h, m, s) {
+    const p = function(n) { return String(n).padStart(2,"0"); };
+    return date.getFullYear()+"-"+p(date.getMonth()+1)+"-"+p(date.getDate())
+         +"T"+p(h)+":"+p(m)+":"+p(s)+"+09:00";
+}
+
+function parseDateInput(val) {
+    const pts = val.split("-").map(Number);
+    return new Date(pts[0], pts[1]-1, pts[2]);
+}
+
+function toDateInputValue(date) {
+    const p = function(n) { return String(n).padStart(2,"0"); };
+    return date.getFullYear()+"-"+p(date.getMonth()+1)+"-"+p(date.getDate());
+}
+
+function sameDay(a,b) {
+    return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+}
+
+function minDiff(a,b) { return (b-a)/60000; }
+
+function fmtTime(date) {
+    return String(date.getHours()).padStart(2,"0")+":"+String(date.getMinutes()).padStart(2,"0");
+}
+
+function fmtTimeInput(date) { return fmtTime(date); }
+
+function fmtDayLabel(date) {
+    return (date.getMonth()+1)+"/"+date.getDate()+"("+DAYS_JA[date.getDay()]+")";
+}
+
+function fmtShort(date) { return (date.getMonth()+1)+"/"+date.getDate(); }
+
+let toastTimer = null;
+function showToast(msg, isError) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className = "toast" + (isError ? " error" : "");
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { el.classList.remove("show"); }, 3000);
+}
+
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeModal();
+    if (e.key === "Enter" && document.getElementById("modal").classList.contains("open")
+        && document.activeElement.tagName !== "TEXTAREA") addEvent();
+});
+
+init();
+</script>
+</body>
+</html>
