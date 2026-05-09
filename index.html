@@ -271,7 +271,7 @@ async function init() {
         }
 
         document.getElementById("start-date").value = toDateInputValue(new Date());
-        document.getElementById("days-ahead").value = 7;
+        document.getElementById("days-ahead").value = calcDefaultDays();
         document.getElementById("modal-start").addEventListener("change", function() {
             const p = this.value.split(":").map(Number);
             if (p.length === 2 && !isNaN(p[0])) {
