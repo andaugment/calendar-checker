@@ -398,8 +398,10 @@ async function fetchAvailability() {
     try {
         const token = await getToken();
         const startDate = parseDateInput(document.getElementById("start-date").value);
-        const endDate = parseDateInput(document.getElementById("end-date").value);
+        const endDateInclusive = parseDateInput(document.getElementById("end-date").value);
+        const endDate = new Date(endDateInclusive);
         endDate.setDate(endDate.getDate() + 1);
+        const days = Math.round((endDate - parseDateInput(document.getElementById("start-date").value)) / 86400000);
         const s = getSettings();
 
         const url = "https://graph.microsoft.com/v1.0/me/calendarView"
