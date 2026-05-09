@@ -150,7 +150,7 @@
       <div class="settings-body" id="settings-body">
         <div class="settings-grid">
           <div class="field"><label>開始日</label><input type="date" id="start-date"></div>
-          <div class="field"><label>確認日数</label><input type="number" id="days-ahead" value="5" min="1" max="30"></div>
+          <div class="field"><label>確認日数</label><input type="number" id="days-ahead" value="7" min="1" max="30"></div>
         </div>
         <div class="settings-grid settings-grid-4">
           <div class="field"><label>営業開始</label><input type="time" id="biz-start" value="09:00"></div>
@@ -271,7 +271,7 @@ async function init() {
         }
 
         document.getElementById("start-date").value = toDateInputValue(new Date());
-        document.getElementById("days-ahead").value = calcDefaultDays();
+        document.getElementById("days-ahead").value = 7;
         document.getElementById("modal-start").addEventListener("change", function() {
             const p = this.value.split(":").map(Number);
             if (p.length === 2 && !isNaN(p[0])) {
@@ -288,7 +288,7 @@ async function init() {
         }
 
         loadSettings();
-        ["biz-start","biz-end","buffer-min","min-slot","exclude-weekends"].forEach(function(id) {
+        ["biz-start","biz-end","buffer-min","min-slot","exclude-weekends","days-ahead"].forEach(function(id) {
             document.getElementById(id).addEventListener("change", saveSettings);
         });
 
@@ -369,6 +369,7 @@ function saveSettings() {
             bufferMin: document.getElementById("buffer-min").value,
             minSlot:   document.getElementById("min-slot").value,
             excludeWeekends: document.getElementById("exclude-weekends").checked,
+            daysAhead: document.getElementById("days-ahead").value,
         }));
     } catch(e) {}
 }
@@ -383,6 +384,7 @@ function loadSettings() {
         if (p.bufferMin !== undefined) document.getElementById("buffer-min").value = p.bufferMin;
         if (p.minSlot   !== undefined) document.getElementById("min-slot").value   = p.minSlot;
         if (p.excludeWeekends !== undefined) document.getElementById("exclude-weekends").checked = p.excludeWeekends;
+        if (p.daysAhead   !== undefined) document.getElementById("days-ahead").value = p.daysAhead;
     } catch(e) {}
 }
 
