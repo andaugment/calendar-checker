@@ -143,13 +143,15 @@
             <option value="120">120分</option>
           </select>
         </div>
-        <div class="field"><label>最小コマ</label>
+        <div class="field"><label>最低空き時間</label>
           <select id="min-slot">
             <option value="15">15分</option>
             <option value="30">30分</option>
             <option value="45">45分</option>
             <option value="60" selected>60分</option>
             <option value="90">90分</option>
+            <option value="120">120分</option>
+            <option value="180">180分</option>
           </select>
         </div>
       </div>
@@ -213,7 +215,7 @@ const msalInstance = new msal.PublicClientApplication({
         authority: "https://login.microsoftonline.com/common",
         redirectUri: REDIRECT_URI,
     },
-    cache: { cacheLocation: "localStorage" },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true },
 });
 
 const SCOPES = ["Calendars.Read", "Calendars.ReadWrite"];

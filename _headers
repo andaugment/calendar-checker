@@ -3,4 +3,4 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src https://login.microsoftonline.com https://login.microsoft.com https://graph.microsoft.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; form-action 'self' https://login.microsoftonline.com https://login.microsoft.com
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://sts.windows.net https://graph.microsoft.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; form-action 'self' https://login.microsoftonline.com https://login.microsoft.com
