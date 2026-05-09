@@ -127,7 +127,7 @@
       <div class="login-icon">&#128197;</div>
       <h2>空き時間チェッカー</h2>
       <p>Microsoftアカウントで認証して<br>Outlookカレンダーの空き時間を確認します</p>
-      <button class="btn-ms" id="login-btn" onclick="login()" disabled>読み込み中…</button>
+      <button class="btn-ms" id="login-btn" onclick="login()" disabled aria-label="Microsoftでログイン">読み込み中…</button>
     </div>
   </div>
 </div>
@@ -138,19 +138,19 @@
     <h1>&#128197; 空き時間チェッカー</h1>
     <div class="header-right">
       <span id="user-label"></span>
-      <button class="btn-logout" onclick="logout()">ログアウト</button>
+      <button class="btn-logout" onclick="logout()" aria-label="ログアウト">ログアウト</button>
     </div>
   </div>
   <div class="main">
     <div class="card">
-      <div class="settings-toggle" onclick="toggleSettings()">
+      <div class="settings-toggle" onclick="toggleSettings()" role="button" aria-expanded="true" aria-controls="settings-body" id="settings-toggle">
         <span>&#9881; 検索条件</span>
         <span class="settings-toggle-icon" id="settings-icon">&#9660;</span>
       </div>
       <div class="settings-body" id="settings-body">
         <div class="settings-grid">
-          <div class="field"><label>開始日</label><input type="date" id="start-date"></div>
-          <div class="field"><label>終了日</label><input type="date" id="end-date"></div>
+          <div class="field"><label for="start-date">開始日</label><input type="date" id="start-date" aria-label="検索開始日"></div>
+          <div class="field"><label for="end-date">終了日</label><input type="date" id="end-date" aria-label="検索終了日"></div>
         </div>
         <div class="settings-grid settings-grid-4">
           <div class="field"><label>営業開始</label><input type="time" id="biz-start" value="09:00"></div>
@@ -185,7 +185,7 @@
           </label>
         </div>
       </div>
-      <button class="btn-primary" id="fetch-btn" onclick="fetchAvailability()">空き時間を確認する</button>
+      <button class="btn-primary" id="fetch-btn" onclick="fetchAvailability()" aria-label="空き時間を確認する">空き時間を確認する</button>
     </div>
     <div id="results-section" style="display:none">
       <div class="card">
@@ -193,8 +193,8 @@
           <h2 id="results-title">空き時間</h2>
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="view-toggle">
-              <button class="toggle-btn active" id="btn-list" onclick="setView('list')">リスト</button>
-              <button class="toggle-btn" id="btn-cal" onclick="setView('cal')">カレンダー</button>
+              <button class="toggle-btn active" id="btn-list" onclick="setView('list')" aria-pressed="true" aria-label="リスト表示">リスト</button>
+              <button class="toggle-btn" id="btn-cal" onclick="setView('cal')" aria-pressed="false" aria-label="カレンダー表示">カレンダー</button>
             </div>
             <button class="btn-secondary" onclick="copyAll()">&#128203; コピー</button>
           </div>
@@ -207,20 +207,20 @@
 </div>
 
 <!-- ADD MEETING MODAL -->
-<div class="modal-overlay" id="modal" onclick="onOverlayClick(event)">
+<div class="modal-overlay" id="modal" onclick="onOverlayClick(event)" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
   <div class="modal">
     <div class="modal-handle"></div>
-    <h3>&#128197; 予定を追加</h3>
+    <h3 id="modal-heading">&#128197; 予定を追加</h3>
     <div class="form-group"><label>日時（空き枠）</label><input type="text" id="modal-datetime" readonly></div>
-    <div class="form-group"><label>タイトル <span style="color:var(--red)">*</span></label><input type="text" id="modal-title" placeholder="例：〇〇様MTG"></div>
+    <div class="form-group"><label>タイトル <span style="color:var(--red)">*</span></label><input type="text" id="modal-title" placeholder="例：〇〇様MTG" aria-required="true"></div>
     <div class="time-row">
       <div class="form-group"><label>開始時刻</label><input type="time" id="modal-start"></div>
       <div class="form-group"><label>終了時刻</label><input type="time" id="modal-end"></div>
     </div>
     <div class="form-group"><label>メモ（任意）</label><textarea id="modal-notes" placeholder="会議の詳細・場所など"></textarea></div>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="closeModal()">キャンセル</button>
-      <button class="btn-primary" id="add-btn" onclick="addEvent()" style="width:auto;padding:9px 28px">追加する</button>
+      <button class="btn-ghost" onclick="closeModal()" aria-label="キャンセル">キャンセル</button>
+      <button class="btn-primary" id="add-btn" onclick="addEvent()" style="width:auto;padding:9px 28px" aria-label="予定を追加する">追加する</button>
     </div>
   </div>
 </div>
@@ -245,6 +245,11 @@ const msalInstance = new msal.PublicClientApplication({
 
 const SCOPES = ["Calendars.Read", "Calendars.ReadWrite"];
 const DAYS_JA = ["日","月","火","水","木","金","土"];
+const HOUR_MS        = 3600000;
+const TOAST_MS       = 3000;
+const API_TOP        = 200;
+const POST_ADD_DELAY = 800;
+const CAL_PX_PER_MIN = 1.4;
 
 let account = null;
 let pendingSlot = null;
@@ -318,7 +323,7 @@ async function init() {
     } catch(e) {
         btn.disabled = false;
         btn.textContent = "再読み込みしてください";
-        showToast("初期化エラー: " + e.message, true);
+        showToast("初期化に失敗しました。ページを再読み込みしてください。", true);
         console.error("Init failed:", e);
     }
 }
@@ -334,7 +339,7 @@ async function login() {
         await msalInstance.loginRedirect({ scopes: SCOPES, prompt: "select_account" });
         // navigates away; result handled by handleRedirectPromise in init()
     } catch(e) {
-        if (e.errorCode !== "user_cancelled") showToast("ログイン失敗: " + e.message, true);
+        if (e.errorCode !== "user_cancelled") showToast(friendlyError(e), true);
     }
 }
 
@@ -379,7 +384,7 @@ function saveSettings() {
             minSlot:   document.getElementById("min-slot").value,
             excludeWeekends: document.getElementById("exclude-weekends").checked,
         }));
-    } catch(e) {}
+    } catch(e) { console.warn("saveSettings failed:", e); }
 }
 
 function loadSettings() {
@@ -392,7 +397,7 @@ function loadSettings() {
         if (p.bufferMin !== undefined) document.getElementById("buffer-min").value = p.bufferMin;
         if (p.minSlot   !== undefined) document.getElementById("min-slot").value   = p.minSlot;
         if (p.excludeWeekends !== undefined) document.getElementById("exclude-weekends").checked = p.excludeWeekends;
-    } catch(e) {}
+    } catch(e) { console.warn("loadSettings failed:", e); }
 }
 
 async function fetchAvailability() {
@@ -430,14 +435,16 @@ async function fetchAvailability() {
             + "&endDateTime="   + encodeURIComponent(toISO8601JST(endDate,0,0,0))
             + "&$select=subject,start,end,isAllDay"
             + "&$orderby=start/dateTime"
-            + "&$top=200";
+            + "&$top=" + API_TOP;
 
         const resp = await fetch(url, {
             headers: { Authorization: "Bearer " + token, Prefer: "outlook.timezone=\"Asia/Tokyo\"" }
         });
         if (!resp.ok) throw new Error("カレンダー取得エラー（HTTP " + resp.status + "）");
 
-        const { value: events } = await resp.json();
+        const json = await resp.json();
+        if (!Array.isArray(json.value)) throw new Error("カレンダーデータの形式が不正です");
+        const events = json.value;
         lastEvents = events;
         lastFreeSlots = calcFreeSlots(events, startDate, days, s);
         lastCalData = { events, freeSlots: lastFreeSlots, startDate, days, s };
@@ -447,7 +454,7 @@ async function fetchAvailability() {
         const errEl = document.createElement("div");
         errEl.className = "no-slots";
         errEl.style.color = "var(--red)";
-        errEl.textContent = "エラー: " + e.message;
+        errEl.textContent = friendlyError(e);
         content.innerHTML = "";
         content.appendChild(errEl);
     } finally {
@@ -628,9 +635,23 @@ function copyAll() {
         const times = item.slots.map(function(s) { return fmtTime(s.start) + "～" + fmtTime(s.end); }).join("、");
         return fmtDayLabel(item.date) + " " + times;
     }).join("\n");
-    navigator.clipboard.writeText(text)
-        .then(function() { showToast("クリップボードにコピーしました"); })
-        .catch(function() { showToast("コピーに失敗しました", true); });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(function() { showToast("クリップボードにコピーしました"); })
+            .catch(function() { fallbackCopy(text); });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); showToast("クリップボードにコピーしました"); }
+    catch(e) { showToast("コピーに失敗しました。手動でコピーしてください。", true); }
+    document.body.removeChild(ta);
 }
 
 function openModal(dateISO, startISO, endISO, label) {
@@ -638,9 +659,8 @@ function openModal(dateISO, startISO, endISO, label) {
     pendingSlot = { dateISO: dateISO, start: start, end: end };
     document.getElementById("modal-datetime").value = label + " " + fmtTime(start) + "～" + fmtTime(end);
     document.getElementById("modal-title").value = "";
-    document.getElementById("modal-start").value = fmtTimeInput(start);
-    var defEnd = new Date(Math.min(start.getTime() + 3600000, end.getTime()));
-    document.getElementById("modal-end").value   = fmtTimeInput(defEnd);
+    document.getElementById("modal-start").value = fmtTime(start);
+    document.getElementById("modal-end").value = fmtTime(new Date(Math.min(start.getTime() + HOUR_MS, end.getTime())));
     document.getElementById("modal-notes").value = "";
     document.getElementById("modal").classList.add("open");
     setTimeout(function() { document.getElementById("modal-title").focus(); }, 50);
@@ -672,7 +692,7 @@ async function addEvent() {
 
     if (sp[0]*60+sp[1] >= ep[0]*60+ep[1]) { showToast("終了時刻は開始時刻より後にしてください", true); return; }
     const addBtn = document.getElementById("add-btn");
-    addBtn.disabled = true; addBtn.textContent = "追加中…";
+    addBtn.disabled = true; addBtn.setAttribute("aria-busy","true"); addBtn.textContent = "追加中…";
 
     try {
         const token = await getToken();
@@ -693,12 +713,23 @@ async function addEvent() {
         }
         closeModal();
         showToast("「" + title + "」を追加しました");
-        setTimeout(fetchAvailability, 800);
+        setTimeout(fetchAvailability, POST_ADD_DELAY);
     } catch(e) {
-        showToast("追加失敗: " + e.message, true);
+        showToast(friendlyError(e), true);
     } finally {
-        addBtn.disabled = false; addBtn.textContent = "追加する";
+        addBtn.disabled = false; addBtn.removeAttribute("aria-busy"); addBtn.textContent = "追加する";
     }
+}
+
+function friendlyError(e) {
+    const m = e.message || "";
+    if (m.includes("401")) return "認証が切れました。再度ログインしてください。";
+    if (m.includes("403")) return "カレンダーへのアクセス権限がありません。";
+    if (m.includes("429")) return "リクエストが多すぎます。しばらく待ってから再試行してください。";
+    if (m.includes("50"))  return "サーバーエラーが発生しました。しばらく待ってから再試行してください。";
+    if (m.includes("Failed to fetch") || m.includes("NetworkError")) return "ネットワークエラー。接続を確認してください。";
+    if (m.includes("再認証")) return m;
+    return m || "予期しないエラーが発生しました。";
 }
 
 function parseJST(dtStr) {
@@ -717,7 +748,9 @@ function toISO8601JST(date, h, m, s) {
 }
 
 function parseDateInput(val) {
+    if (!val || typeof val !== "string") return new Date(NaN);
     const pts = val.split("-").map(Number);
+    if (pts.length !== 3 || pts.some(isNaN)) return new Date(NaN);
     return new Date(pts[0], pts[1]-1, pts[2]);
 }
 
@@ -745,13 +778,13 @@ function toggleSettings() {
     var hidden = body.style.display === 'none';
     body.style.display = hidden ? '' : 'none';
     icon.style.transform = hidden ? '' : 'rotate(-90deg)';
+    document.getElementById('settings-toggle').setAttribute('aria-expanded', hidden ? 'true' : 'false');
 }
 
 function fmtTime(date) {
     return String(date.getHours()).padStart(2,"0")+":"+String(date.getMinutes()).padStart(2,"0");
 }
 
-function fmtTimeInput(date) { return fmtTime(date); }
 
 function fmtDayLabel(date) {
     return (date.getMonth()+1)+"/"+date.getDate()+"("+DAYS_JA[date.getDay()]+")";
@@ -766,7 +799,7 @@ function showToast(msg, isError) {
     el.className = "toast" + (isError ? " error" : "");
     el.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function() { el.classList.remove("show"); }, 3000);
+    toastTimer = setTimeout(function() { el.classList.remove("show"); }, TOAST_MS);
 }
 
 document.addEventListener("keydown", function(e) {
@@ -784,7 +817,9 @@ function setView(v) {
     document.getElementById('results-content').style.display = v === 'list' ? '' : 'none';
     document.getElementById('cal-section').style.display = v === 'cal' ? '' : 'none';
     document.getElementById('btn-list').classList.toggle('active', v === 'list');
+    document.getElementById('btn-list').setAttribute('aria-pressed', v === 'list');
     document.getElementById('btn-cal').classList.toggle('active', v === 'cal');
+    document.getElementById('btn-cal').setAttribute('aria-pressed', v === 'cal');
     if (v === 'cal' && lastCalData) renderCalendar();
 }
 
@@ -793,7 +828,7 @@ function renderCalendar() {
     const bizStartMin = s.bizStartH * 60 + s.bizStartM;
     const bizEndMin   = s.bizEndH   * 60 + s.bizEndM;
     const totalMin    = bizEndMin - bizStartMin;
-    const PX = 1.4;
+    const PX = CAL_PX_PER_MIN;
     const totalH = totalMin * PX;
 
     const dates = [];
