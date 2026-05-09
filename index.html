@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>空き時間チェッカー</title>
-    <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2/lib/msal-browser.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="空き時間">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0078d4">
     <style>
         :root{--primary:#0078d4;--primary-hover:#106ebe;--bg:#f3f2f1;--surface:#ffffff;--border:#e1e1e1;--text:#323130;--muted:#605e5c;--green:#107c10;--green-bg:#dff0d4;--green-border:#9fcf87;--red:#d13438;}
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -23,11 +29,11 @@
         .login-card{text-align:center;padding:56px 32px;}
         .login-card h2{font-size:22px;margin-bottom:8px;}
         .login-card p{color:var(--muted);margin-bottom:28px;}
-        .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
-        @media(max-width:560px){.settings-grid{grid-template-columns:1fr;}}
+        .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}.settings-grid-4{grid-template-columns:repeat(4,1fr);}@media(max-width:640px){.settings-grid-4{grid-template-columns:1fr 1fr;}}@media(max-width:400px){.settings-grid,.settings-grid-4{grid-template-columns:1fr;}}
+        
         .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
-        .field input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-family:inherit;color:var(--text);}
-        .field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(0,120,212,.15);}
+        .field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-family:inherit;color:var(--text);background:white;}
+        .field input:focus,.field select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(0,120,212,.15);}.checkbox-row{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:18px;}.checkbox-item{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;user-select:none;}.checkbox-item input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--primary);}
         .btn-primary{background:var(--primary);color:white;border:none;padding:11px 28px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;width:100%;transition:background .15s;}
         .btn-primary:hover:not(:disabled){background:var(--primary-hover);}
         .btn-primary:disabled{background:#c8c6c4;cursor:not-allowed;}
@@ -40,7 +46,7 @@
         .day-group{margin-bottom:20px;}
         .day-label{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
         .slot-list{display:flex;flex-wrap:wrap;gap:8px;}
-        .slot-chip{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;user-select:none;transition:background .15s,transform .1s;}
+        .slot-chip{display:inline-flex;flex-direction:column;align-items:stretch;background:var(--green-bg);border:1px solid var(--green-border);border-radius:12px;padding:8px 14px;cursor:pointer;user-select:none;transition:background .15s,transform .1s;min-width:148px;}.slot-chip-top{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;padding:2px 0;}.slot-ctx-prev{font-size:11px;color:#4a6e4a;padding-bottom:5px;margin-bottom:5px;border-bottom:1px solid var(--green-border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.slot-ctx-next{font-size:11px;color:#4a6e4a;padding-top:5px;margin-top:5px;border-top:1px solid var(--green-border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.slot-chip .plus{color:var(--green);font-weight:700;}
         .slot-chip:hover{background:#c6e8b0;transform:translateY(-1px);}
         .slot-chip:active{transform:translateY(0);}
         .slot-chip .plus{color:var(--green);font-weight:700;}
@@ -63,6 +69,23 @@
         .toast{position:fixed;bottom:24px;right:24px;background:#323130;color:white;padding:12px 20px;border-radius:6px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;z-index:200;max-width:320px;}
         .toast.show{opacity:1;transform:translateY(0);}
         .toast.error{background:var(--red);}
+
+        .view-toggle{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--primary);border-radius:6px;overflow:hidden;width:fit-content;}
+        .toggle-btn{background:white;color:var(--primary);border:none;padding:6px 20px;font-size:13px;font-weight:600;cursor:pointer;}
+        .toggle-btn.active{background:var(--primary);color:white;}
+        .week-cal{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+        .wv-header{display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:10;}
+        .wv-gutter{width:44px;flex-shrink:0;}
+        .wv-day-hdr{flex:1;min-width:72px;text-align:center;padding:8px 2px;font-size:12px;font-weight:700;border-left:1px solid var(--border);}
+        .wv-body{display:flex;}
+        .wv-times{width:44px;flex-shrink:0;position:relative;}
+        .wv-time-label{position:absolute;right:4px;font-size:10px;color:var(--muted);transform:translateY(-50%);line-height:1;}
+        .wv-col{flex:1;min-width:72px;position:relative;border-left:1px solid var(--border);}
+        .wv-hour-line{position:absolute;left:0;right:0;border-top:1px solid #f0f0f0;}
+        .wv-half-line{position:absolute;left:0;right:0;border-top:1px dashed #f5f5f5;}
+        .wv-event{position:absolute;left:2px;right:2px;background:#c5daf0;border-left:3px solid var(--primary);border-radius:3px;padding:2px 4px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;z-index:2;cursor:default;}
+        .wv-free{position:absolute;left:2px;right:2px;background:rgba(223,240,212,0.85);border:1px solid var(--green-border);border-radius:3px;cursor:pointer;z-index:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--green);font-weight:600;}
+        .wv-free:hover{background:var(--green-bg);}
     </style>
 </head>
 <body>
@@ -86,7 +109,7 @@
     <div class="card login-card">
       <h2>Microsoftアカウントでログイン</h2>
       <p>Outlookカレンダーの空き時間を確認します</p>
-      <button class="btn-primary" id="login-btn" onclick="login()" style="width:auto;padding:12px 40px;">Microsoftでログイン</button>
+      <button class="btn-primary" id="login-btn" onclick="login()" style="width:auto;padding:12px 40px;" disabled>読み込み中…</button>
     </div>
   </div>
 </div>
@@ -106,15 +129,52 @@
         <div class="field"><label>開始日</label><input type="date" id="start-date"></div>
         <div class="field"><label>確認日数</label><input type="number" id="days-ahead" value="5" min="1" max="30"></div>
       </div>
+      <div class="settings-grid settings-grid-4">
+        <div class="field"><label>営業開始</label><input type="time" id="biz-start" value="09:00"></div>
+        <div class="field"><label>営業終了</label><input type="time" id="biz-end" value="18:00"></div>
+        <div class="field"><label>前後バッファ</label>
+          <select id="buffer-min">
+            <option value="0">なし</option>
+            <option value="15">15分</option>
+            <option value="30">30分</option>
+            <option value="45">45分</option>
+            <option value="60" selected>60分</option>
+            <option value="90">90分</option>
+            <option value="120">120分</option>
+          </select>
+        </div>
+        <div class="field"><label>最小コマ</label>
+          <select id="min-slot">
+            <option value="15">15分</option>
+            <option value="30">30分</option>
+            <option value="45">45分</option>
+            <option value="60" selected>60分</option>
+            <option value="90">90分</option>
+          </select>
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <label class="checkbox-item">
+          <input type="checkbox" id="exclude-weekends" checked>
+          土日祝を除外する
+        </label>
+      </div>
       <button class="btn-primary" id="fetch-btn" onclick="fetchAvailability()">空き時間を確認する</button>
     </div>
     <div id="results-section" style="display:none">
       <div class="card">
         <div class="results-header">
           <h2 id="results-title">空き時間</h2>
-          <button class="btn-secondary" onclick="copyAll()">&#128203; テキストコピー</button>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="view-toggle">
+              <button class="toggle-btn active" id="btn-list" onclick="setView('list')">リスト</button>
+              <button class="toggle-btn" id="btn-cal" onclick="setView('cal')">カレンダー</button>
+            </div>
+            <button class="btn-secondary" onclick="copyAll()">&#128203; コピー</button>
+          </div>
         </div>
         <div id="results-content"></div>
+        <div id="cal-section" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -143,17 +203,8 @@
 // ============================================================
 // ★ 設定：Azure ADアプリ登録後にCLIENT_IDを変更してください
 // ============================================================
-const CLIENT_ID = "YOUR_CLIENT_ID_HERE";
+const CLIENT_ID = "5fb6a3ca-4466-406f-928e-0ab3be3bb08b";
 
-const SETTINGS = {
-    businessStart: 9,
-    businessEnd:   18,
-    bufferMin:     60,
-    minSlotMin:    30,
-};
-// ============================================================
-
-// localhost と本番URL の両方で動作するよう自動判定
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 
 const msalInstance = new msal.PublicClientApplication({
@@ -162,7 +213,7 @@ const msalInstance = new msal.PublicClientApplication({
         authority: "https://login.microsoftonline.com/common",
         redirectUri: REDIRECT_URI,
     },
-    cache: { cacheLocation: "sessionStorage" },
+    cache: { cacheLocation: "localStorage" },
 });
 
 const SCOPES = ["Calendars.Read", "Calendars.ReadWrite"];
@@ -171,20 +222,69 @@ const DAYS_JA = ["日","月","火","水","木","金","土"];
 let account = null;
 let pendingSlot = null;
 let lastFreeSlots = [];
+const PREFS_KEY = "cal-checker-prefs";
+let currentView = "list";
+
+function calcDefaultDays() {
+    const dow = new Date().getDay();
+    const daysToNextMonday = ((1 - dow + 7) % 7) || 7;
+    return daysToNextMonday + 5;  // next Monday + 4(Fri) + 1(include today)
+}
 
 async function init() {
-    await msalInstance.initialize();
-    if (CLIENT_ID === "YOUR_CLIENT_ID_HERE") {
-        document.getElementById("setup-banner").style.display = "block";
-        document.getElementById("login-btn").disabled = true;
-    }
-    document.getElementById("start-date").value = toDateInputValue(new Date());
+    const btn = document.getElementById("login-btn");
     try {
-        const resp = await msalInstance.handleRedirectPromise();
-        if (resp) { account = resp.account; showMain(); return; }
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) { account = accounts[0]; showMain(); }
-    } catch(e) { console.error(e); }
+        await msalInstance.initialize();
+
+        if (CLIENT_ID === "YOUR_CLIENT_ID_HERE") {
+            document.getElementById("setup-banner").style.display = "block";
+        } else {
+            btn.disabled = false;
+            btn.textContent = "Microsoftでログイン";
+        }
+
+        document.getElementById("start-date").value = toDateInputValue(new Date());
+        document.getElementById("days-ahead").value = calcDefaultDays();
+        document.getElementById("modal-start").addEventListener("change", function() {
+            const p = this.value.split(":").map(Number);
+            if (p.length === 2 && !isNaN(p[0])) {
+                const p2 = function(n) { return String(n).padStart(2,"0"); };
+                const nextH = p[0] + 1;
+                document.getElementById("modal-end").value = nextH <= 23
+                    ? p2(nextH) + ":" + p2(p[1])
+                    : "23:59";
+            }
+        });
+
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("./sw.js").catch(() => {});
+        }
+
+        loadSettings();
+        ["biz-start","biz-end","buffer-min","min-slot","exclude-weekends"].forEach(function(id) {
+            document.getElementById(id).addEventListener("change", saveSettings);
+        });
+
+        try {
+            const resp = await msalInstance.handleRedirectPromise();
+            if (resp) {
+                account = resp.account;
+                showMain();
+            } else {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    account = accounts[0];
+                    showMain();
+                }
+            }
+        } catch(e) { console.error(e); }
+
+    } catch(e) {
+        btn.disabled = false;
+        btn.textContent = "再読み込みしてください";
+        showToast("初期化エラー: " + e.message, true);
+        console.error("Init failed:", e);
+    }
 }
 
 function showMain() {
@@ -195,19 +295,18 @@ function showMain() {
 
 async function login() {
     try {
-        const r = await msalInstance.loginPopup({ scopes: SCOPES });
-        account = r.account; showMain();
+        await msalInstance.loginRedirect({ scopes: SCOPES, prompt: "select_account" });
+        // navigates away; result handled by handleRedirectPromise in init()
     } catch(e) {
         if (e.errorCode !== "user_cancelled") showToast("ログイン失敗: " + e.message, true);
     }
 }
 
 function logout() {
-    msalInstance.logoutPopup().then(() => {
-        account = null;
-        document.getElementById("view-login").style.display = "block";
-        document.getElementById("view-main").style.display = "none";
-        document.getElementById("results-section").style.display = "none";
+    // clear all cached accounts so auto-login does not happen on next visit
+    msalInstance.logoutRedirect({
+        account,
+        postLogoutRedirectUri: REDIRECT_URI,
     });
 }
 
@@ -216,9 +315,48 @@ async function getToken() {
         const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
         return r.accessToken;
     } catch {
-        const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
-        return r.accessToken;
+        // silent failed (token expired etc.) -> redirect to re-auth
+        await msalInstance.acquireTokenRedirect({ scopes: SCOPES, account });
+        throw new Error("再認証のためリダイレクト中…");
     }
+}
+
+function getSettings() {
+    const bs = document.getElementById("biz-start").value.split(":").map(Number);
+    const be = document.getElementById("biz-end").value.split(":").map(Number);
+    return {
+        bizStartH: bs[0], bizStartM: bs[1] || 0,
+        bizEndH:   be[0], bizEndM:   be[1] || 0,
+        bufferMin:  parseInt(document.getElementById("buffer-min").value),
+        minSlotMin: parseInt(document.getElementById("min-slot").value),
+        excludeWeekends: document.getElementById("exclude-weekends").checked,
+    };
+}
+
+
+function saveSettings() {
+    try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify({
+            bizStart: document.getElementById("biz-start").value,
+            bizEnd:   document.getElementById("biz-end").value,
+            bufferMin: document.getElementById("buffer-min").value,
+            minSlot:   document.getElementById("min-slot").value,
+            excludeWeekends: document.getElementById("exclude-weekends").checked,
+        }));
+    } catch(e) {}
+}
+
+function loadSettings() {
+    try {
+        const raw = localStorage.getItem(PREFS_KEY);
+        if (!raw) return;
+        const p = JSON.parse(raw);
+        if (p.bizStart)  document.getElementById("biz-start").value = p.bizStart;
+        if (p.bizEnd)    document.getElementById("biz-end").value   = p.bizEnd;
+        if (p.bufferMin !== undefined) document.getElementById("buffer-min").value = p.bufferMin;
+        if (p.minSlot   !== undefined) document.getElementById("min-slot").value   = p.minSlot;
+        if (p.excludeWeekends !== undefined) document.getElementById("exclude-weekends").checked = p.excludeWeekends;
+    } catch(e) {}
 }
 
 async function fetchAvailability() {
@@ -234,6 +372,7 @@ async function fetchAvailability() {
         const days = Math.max(1, parseInt(document.getElementById("days-ahead").value) || 5);
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + days);
+        const s = getSettings();
 
         const url = "https://graph.microsoft.com/v1.0/me/calendarView"
             + "?startDateTime=" + encodeURIComponent(toISO8601JST(startDate,0,0,0))
@@ -248,8 +387,11 @@ async function fetchAvailability() {
         if (!resp.ok) throw new Error("カレンダー取得エラー（HTTP " + resp.status + "）");
 
         const { value: events } = await resp.json();
-        lastFreeSlots = calcFreeSlots(events, startDate, days);
+        lastEvents = events;
+        lastFreeSlots = calcFreeSlots(events, startDate, days, s);
+        lastCalData = { events, freeSlots: lastFreeSlots, startDate, days, s };
         displayResults(lastFreeSlots, startDate, days);
+        setView(currentView);
     } catch(e) {
         const errEl = document.createElement("div");
         errEl.className = "no-slots";
@@ -262,45 +404,64 @@ async function fetchAvailability() {
     }
 }
 
-function calcFreeSlots(events, startDate, days) {
+const JP_HOLIDAYS = new Set([
+    "2025-01-01","2025-01-13","2025-02-11","2025-02-23","2025-02-24",
+    "2025-03-20","2025-04-29","2025-05-03","2025-05-04","2025-05-05",
+    "2025-07-21","2025-08-11","2025-09-15","2025-09-23","2025-10-13",
+    "2025-11-03","2025-11-23","2025-11-24",
+    "2026-01-01","2026-01-12","2026-02-11","2026-02-23",
+    "2026-03-20","2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06",
+    "2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23",
+    "2026-10-12","2026-11-03","2026-11-23",
+    "2027-01-01","2027-01-11","2027-02-11","2027-02-23",
+    "2027-03-21","2027-04-29","2027-05-03","2027-05-04","2027-05-05",
+    "2027-07-19","2027-08-11","2027-09-20","2027-09-23",
+    "2027-10-11","2027-11-03","2027-11-23",
+]);
+function isJpHoliday(date) {
+    const p = function(n) { return String(n).padStart(2, "0"); };
+    return JP_HOLIDAYS.has(date.getFullYear() + "-" + p(date.getMonth()+1) + "-" + p(date.getDate()));
+}
+
+function calcFreeSlots(events, startDate, days, s) {
     const result = [];
     for (let i = 0; i < days; i++) {
         const date = new Date(startDate);
         date.setDate(date.getDate() + i);
         const dow = date.getDay();
-        if (dow === 0 || dow === 6) continue;
-        const slots = calcDaySlots(events, date);
+        if (s.excludeWeekends && (dow === 0 || dow === 6 || isJpHoliday(date))) continue;
+        const slots = calcDaySlots(events, date, s);
         if (slots.length > 0) result.push({ date, slots });
     }
     return result;
 }
 
-function calcDaySlots(events, date) {
-    const dayStart = localHM(date, SETTINGS.businessStart, 0);
-    const dayEnd   = localHM(date, SETTINGS.businessEnd,   0);
+function calcDaySlots(events, date, s) {
+    const dayStart = localHM(date, s.bizStartH, s.bizStartM);
+    const dayEnd   = localHM(date, s.bizEndH,   s.bizEndM);
 
-    const hasAllDay = events.some(e => {
+    const hasAllDay = events.some(function(e) {
         if (!e.isAllDay) return false;
         return sameDay(new Date(e.start.date + "T00:00:00"), date);
     });
     if (hasAllDay) return [];
 
-    const dayEvents = events.filter(e => {
+    const dayEvents = events.filter(function(e) {
         if (e.isAllDay) return false;
-        const s = parseJST(e.start.dateTime), en = parseJST(e.end.dateTime);
-        return s < dayEnd && en > dayStart;
+        const es = parseJST(e.start.dateTime), ee = parseJST(e.end.dateTime);
+        return es < dayEnd && ee > dayStart;
     });
 
-    const blocks = dayEvents.map(e => {
-        const s = parseJST(e.start.dateTime), en = parseJST(e.end.dateTime);
-        const buf = new Date(en.getTime() + SETTINGS.bufferMin * 60000);
+    const bufMs = s.bufferMin * 60000;
+    const blocks = dayEvents.map(function(e) {
+        const es = parseJST(e.start.dateTime), ee = parseJST(e.end.dateTime);
         return {
-            start: new Date(Math.max(s.getTime(),   dayStart.getTime())),
-            end:   new Date(Math.min(buf.getTime(), dayEnd.getTime())),
+            start: new Date(Math.max(es.getTime() - bufMs, dayStart.getTime())),
+            end:   new Date(Math.min(ee.getTime() + bufMs, dayEnd.getTime())),
         };
     });
 
-    blocks.sort((a, b) => a.start - b.start);
+    blocks.sort(function(a, b) { return a.start - b.start; });
     const merged = [];
     for (const b of blocks) {
         if (!merged.length || b.start >= merged[merged.length-1].end) {
@@ -311,15 +472,23 @@ function calcDaySlots(events, date) {
         }
     }
 
+    function nearestPrev(t) {
+        return dayEvents.filter(function(e){ return parseJST(e.end.dateTime) <= t; })
+            .sort(function(a,b){ return parseJST(b.end.dateTime) - parseJST(a.end.dateTime); })[0] || null;
+    }
+    function nearestNext(t) {
+        return dayEvents.filter(function(e){ return parseJST(e.start.dateTime) >= t; })
+            .sort(function(a,b){ return parseJST(a.start.dateTime) - parseJST(b.start.dateTime); })[0] || null;
+    }
     const free = [];
     let cur = new Date(dayStart);
     for (const blk of merged) {
-        if (cur < blk.start && minDiff(cur, blk.start) >= SETTINGS.minSlotMin)
-            free.push({ start: new Date(cur), end: new Date(blk.start) });
+        if (cur < blk.start && minDiff(cur, blk.start) >= s.minSlotMin)
+            free.push({ start: new Date(cur), end: new Date(blk.start), prevEvt: nearestPrev(cur), nextEvt: nearestNext(blk.start) });
         if (blk.end > cur) cur = new Date(blk.end);
     }
-    if (cur < dayEnd && minDiff(cur, dayEnd) >= SETTINGS.minSlotMin)
-        free.push({ start: new Date(cur), end: new Date(dayEnd) });
+    if (cur < dayEnd && minDiff(cur, dayEnd) >= s.minSlotMin)
+        free.push({ start: new Date(cur), end: new Date(dayEnd), prevEvt: nearestPrev(cur), nextEvt: null });
     return free;
 }
 
@@ -330,19 +499,68 @@ function displayResults(freeSlots, startDate, days) {
         "空き時間（" + fmtShort(startDate) + "～" + fmtShort(endDate) + "）";
 
     const content = document.getElementById("results-content");
+    content.innerHTML = "";
     if (!freeSlots.length) {
-        content.innerHTML = "<div class=\"no-slots\">空き時間が見つかりませんでした</div>";
+        const el = document.createElement("div");
+        el.className = "no-slots";
+        el.textContent = "空き時間が見つかりませんでした";
+        content.appendChild(el);
         return;
     }
 
-    content.innerHTML = freeSlots.map(function(item) {
-        const chips = item.slots.map(function(s) {
-            const d = item.date;
-            return "<div class=\"slot-chip\" onclick=\"openModal(" + JSON.stringify(d.toISOString()) + "," + JSON.stringify(s.start.toISOString()) + "," + JSON.stringify(s.end.toISOString()) + "," + JSON.stringify(fmtDayLabel(d)) + ")\">"
-                + "<span class=\"plus\">＋</span>" + fmtTime(s.start) + "～" + fmtTime(s.end) + "</div>";
-        }).join("");
-        return "<div class=\"day-group\"><div class=\"day-label\">" + fmtDayLabel(item.date) + "</div><div class=\"slot-list\">" + chips + "</div></div>";
-    }).join("");
+    freeSlots.forEach(function(item) {
+        const group = document.createElement("div");
+        group.className = "day-group";
+
+        const lbl = document.createElement("div");
+        lbl.className = "day-label";
+        lbl.textContent = fmtDayLabel(item.date);
+        group.appendChild(lbl);
+
+        const slotList = document.createElement("div");
+        slotList.className = "slot-list";
+
+        item.slots.forEach(function(s) {
+            const chip = document.createElement("div");
+            chip.className = "slot-chip";
+
+            if (s.prevEvt) {
+                const prev = document.createElement("div");
+                prev.className = "slot-ctx-prev";
+                var pt = "◀ " + fmtTime(parseJST(s.prevEvt.end.dateTime)) + "まで";
+                if (s.prevEvt.subject) pt += "  " + s.prevEvt.subject;
+                prev.textContent = pt;
+                chip.appendChild(prev);
+            }
+
+            const top = document.createElement("div");
+            top.className = "slot-chip-top";
+            const plus = document.createElement("span");
+            plus.className = "plus";
+            plus.textContent = "＋";
+            top.appendChild(plus);
+            top.appendChild(document.createTextNode(fmtTime(s.start) + "～" + fmtTime(s.end)));
+            chip.appendChild(top);
+
+            if (s.nextEvt) {
+                const next = document.createElement("div");
+                next.className = "slot-ctx-next";
+                var nt = fmtTime(parseJST(s.nextEvt.start.dateTime)) + "から ▶";
+                if (s.nextEvt.subject) nt += "  " + s.nextEvt.subject;
+                next.textContent = nt;
+                chip.appendChild(next);
+            }
+
+            (function(dISO, sISO, eISO, lISO) {
+                chip.addEventListener("click", function() { openModal(dISO, sISO, eISO, lISO); });
+            })(item.date.toISOString(), s.start.toISOString(), s.end.toISOString(), fmtDayLabel(item.date));
+
+            slotList.appendChild(chip);
+        });
+
+        group.appendChild(slotList);
+        content.appendChild(group);
+    });
 }
 
 function copyAll() {
@@ -362,7 +580,8 @@ function openModal(dateISO, startISO, endISO, label) {
     document.getElementById("modal-datetime").value = label + " " + fmtTime(start) + "～" + fmtTime(end);
     document.getElementById("modal-title").value = "";
     document.getElementById("modal-start").value = fmtTimeInput(start);
-    document.getElementById("modal-end").value   = fmtTimeInput(end);
+    var defEnd = new Date(Math.min(start.getTime() + 3600000, end.getTime()));
+    document.getElementById("modal-end").value   = fmtTimeInput(defEnd);
     document.getElementById("modal-notes").value = "";
     document.getElementById("modal").classList.add("open");
     setTimeout(function() { document.getElementById("modal-title").focus(); }, 50);
@@ -388,6 +607,7 @@ async function addEvent() {
     const startISO = toISO8601JST(baseDate, sp[0], sp[1], 0);
     const endISO   = toISO8601JST(baseDate, ep[0], ep[1], 0);
 
+    if (sp[0]*60+sp[1] >= ep[0]*60+ep[1]) { showToast("終了時刻は開始時刻より後にしてください", true); return; }
     const addBtn = document.getElementById("add-btn");
     addBtn.disabled = true; addBtn.textContent = "追加中…";
 
@@ -403,7 +623,11 @@ async function addEvent() {
                 end:   { dateTime: endISO,   timeZone: "Asia/Tokyo" },
             }),
         });
-        if (!resp.ok) throw new Error("Graph API " + resp.status);
+        if (!resp.ok) {
+            let em = "HTTP " + resp.status;
+            try { const j = await resp.json(); if (j.error?.message) em = j.error.message; } catch(x){}
+            throw new Error(em);
+        }
         closeModal();
         showToast("「" + title + "」を追加しました");
         setTimeout(fetchAvailability, 800);
@@ -472,6 +696,130 @@ document.addEventListener("keydown", function(e) {
     if (e.key === "Enter" && document.getElementById("modal").classList.contains("open")
         && document.activeElement.tagName !== "TEXTAREA") addEvent();
 });
+
+let lastEvents = [];
+let lastCalData = null;
+
+function setView(v) {
+    currentView = v;
+    document.getElementById('results-content').style.display = v === 'list' ? '' : 'none';
+    document.getElementById('cal-section').style.display = v === 'cal' ? '' : 'none';
+    document.getElementById('btn-list').classList.toggle('active', v === 'list');
+    document.getElementById('btn-cal').classList.toggle('active', v === 'cal');
+    if (v === 'cal' && lastCalData) renderCalendar();
+}
+
+function renderCalendar() {
+    const { events, freeSlots, startDate, days, s } = lastCalData;
+    const bizStartMin = s.bizStartH * 60 + s.bizStartM;
+    const bizEndMin   = s.bizEndH   * 60 + s.bizEndM;
+    const totalMin    = bizEndMin - bizStartMin;
+    const PX = 1.4;
+    const totalH = totalMin * PX;
+
+    const dates = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date(startDate); d.setDate(d.getDate() + i);
+        const dow = d.getDay();
+        if (s.excludeWeekends && (dow === 0 || dow === 6 || isJpHoliday(d))) continue;
+        dates.push(new Date(d));
+    }
+
+    const calEl = document.getElementById('cal-section');
+    calEl.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'week-cal';
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.className = 'wv-header';
+    const gut = document.createElement('div');
+    gut.className = 'wv-gutter';
+    hdr.appendChild(gut);
+    dates.forEach(function(d) {
+        const dh = document.createElement('div');
+        dh.className = 'wv-day-hdr';
+        dh.textContent = fmtDayLabel(d);
+        hdr.appendChild(dh);
+    });
+    wrap.appendChild(hdr);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'wv-body';
+
+    // Time column
+    const tc = document.createElement('div');
+    tc.className = 'wv-times';
+    tc.style.height = totalH + 'px';
+    for (let h = s.bizStartH; h <= s.bizEndH; h++) {
+        const tl = document.createElement('div');
+        tl.className = 'wv-time-label';
+        tl.style.top = ((h * 60 - bizStartMin) * PX) + 'px';
+        tl.textContent = String(h).padStart(2,'0') + ':00';
+        tc.appendChild(tl);
+    }
+    body.appendChild(tc);
+
+    // Day columns
+    dates.forEach(function(date) {
+        const col = document.createElement('div');
+        col.className = 'wv-col';
+        col.style.height = totalH + 'px';
+
+        for (let h = s.bizStartH; h < s.bizEndH; h++) {
+            const ln = document.createElement('div');
+            ln.className = 'wv-hour-line';
+            ln.style.top = ((h * 60 - bizStartMin) * PX) + 'px';
+            col.appendChild(ln);
+            const hl = document.createElement('div');
+            hl.className = 'wv-half-line';
+            hl.style.top = ((h * 60 + 30 - bizStartMin) * PX) + 'px';
+            col.appendChild(hl);
+        }
+
+        // Events
+        events.filter(function(e) {
+            if (e.isAllDay) return false;
+            const es = parseJST(e.start.dateTime), ee = parseJST(e.end.dateTime);
+            return sameDay(es, date) || sameDay(ee, date);
+        }).forEach(function(e) {
+            const es = parseJST(e.start.dateTime), ee = parseJST(e.end.dateTime);
+            const sm = Math.max(es.getHours()*60+es.getMinutes(), bizStartMin);
+            const em = Math.min(ee.getHours()*60+ee.getMinutes(), bizEndMin);
+            if (em <= sm) return;
+            const ev = document.createElement('div');
+            ev.className = 'wv-event';
+            ev.style.top    = ((sm - bizStartMin) * PX) + 'px';
+            ev.style.height = Math.max((em - sm) * PX - 2, 14) + 'px';
+            ev.textContent  = e.subject || '(予定)';
+            ev.title        = (e.subject || '') + ' ' + fmtTime(es) + '～' + fmtTime(ee);
+            col.appendChild(ev);
+        });
+
+        // Free slots
+        const df = freeSlots.find(function(item) { return sameDay(item.date, date); });
+        if (df) df.slots.forEach(function(slot) {
+            const sm = slot.start.getHours()*60+slot.start.getMinutes();
+            const em = slot.end.getHours()*60+slot.end.getMinutes();
+            const fr = document.createElement('div');
+            fr.className = 'wv-free';
+            fr.style.top    = ((sm - bizStartMin) * PX) + 'px';
+            fr.style.height = Math.max((em - sm) * PX - 2, 14) + 'px';
+            fr.title        = fmtTime(slot.start) + '～' + fmtTime(slot.end);
+            fr.textContent  = fmtTime(slot.start) + '～' + fmtTime(slot.end);
+            (function(dISO, sISO, eISO, lISO) {
+                fr.addEventListener('click', function() { openModal(dISO, sISO, eISO, lISO); });
+            })(date.toISOString(), slot.start.toISOString(), slot.end.toISOString(), fmtDayLabel(date));
+            col.appendChild(fr);
+        });
+
+        body.appendChild(col);
+    });
+
+    wrap.appendChild(body);
+    calEl.appendChild(wrap);
+}
 
 init();
 </script>
